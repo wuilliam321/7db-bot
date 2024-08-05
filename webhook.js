@@ -2,6 +2,10 @@ var express = require("express");
 var axios = require("axios");
 const fs = require("fs");
 const csv = require("csv-parser");
+const { exec } = require('child_process');
+const { promisify } = require('util');
+
+const execPromise = promisify(exec);
 
 const productos = [];
 
@@ -54,16 +58,44 @@ const sendImageMessage = async (to, imageUrl, text) => {
   }
 };
 
+async function runPythonScript(chatId) {
+  const pythonCommand = '/usr/bin/python3 /home/wuilliam/personal/7db-pagomovil/run.py 17129071 \\$carlos8 1464,40';
+  // const pythonCommand = '/usr/bin/python3 /home/wuilliam/personal/7db-pagomovil/run.py 16444162 \\*Aurora8 1464,40';
+
+  try {
+    const { stdout, stderr } = await execPromise(pythonCommand, { shell: '/bin/bash' });
+
+    if (stderr) {
+      console.error(`Error en la salida estándar: ${stderr}`);
+      return;
+    }
+
+    const lines = stdout.trim().split('\n');
+    console.log(lines);
+
+    let msg = "Saldo:\n" + lines[0] + "\n";
+    msg += "Ultimos movimientos:\n" + lines.slice(1, 6).join("\n");
+    sendImageMessage(chatId, "", msg);
+  } catch (error) {
+    console.error(`Error al ejecutar el comando: ${error.message}`);
+  }
+}
+
 // Función para procesar mensajes entrantes
-const processIncomingMessage = (msg) => {
+const processIncomingMessage = async (msg) => {
   const content = msg.text.body.toUpperCase();
   const chatId = msg.from;
 
-  const codigos = content.split(" ");
-  const respuestas = codigos.map((codigo) => {
-    const producto = productos.find((p) => p.CODIGO === codigo);
-    if (producto) {
-      const infoProducto = `
+  if (content.trim().toLowerCase() == "pagomovil" || content.trim().toLowerCase() == "pago movil" || content.trim().toLowerCase() == "pago móvil") {
+    console.log("vamos a verificar pago movil")
+    sendImageMessage(chatId, "", "Un momento por favor...");
+    runPythonScript(chatId);
+  } else {
+    const codigos = content.split(" ");
+    const respuestas = codigos.map((codigo) => {
+      const producto = productos.find((p) => p.CODIGO === codigo);
+      if (producto) {
+        const infoProducto = `
 ${producto["Vendido"] == "SI" ? "❌ Vendido" : producto["Apartado"] == "SI" ? "🔒 Apartado" : "✅ Disponible"}
 
 *💰 PRECIO: \$${producto["Precio Sugerido"]}*
@@ -73,19 +105,20 @@ Talla: ${producto.TALLA}
 Color: ${capitalize(producto.COLOR)}
 
 📍 Ubicación: ${producto.Ubicacion}`;
-      return { codigo, infoProducto, imageUrl: producto.IMAGEN };
-    } else {
-      return {
-        codigo,
-        infoProducto: "Producto no encontrado",
-        imageUrl: null,
-      };
-    }
-  });
+        return { codigo, infoProducto, imageUrl: producto.IMAGEN };
+      } else {
+        return {
+          codigo,
+          infoProducto: "Producto no encontrado",
+          imageUrl: null,
+        };
+      }
+    });
 
-  respuestas.forEach(({ codigo, infoProducto, imageUrl }) => {
-    sendImageMessage(chatId, imageUrl, `Código: ${codigo}\n${infoProducto}`);
-  });
+    respuestas.forEach(({ codigo, infoProducto, imageUrl }) => {
+      sendImageMessage(chatId, imageUrl, `Código: ${codigo}\n${infoProducto}`);
+    });
+  }
 };
 
 app.post("/webhook", async (req, res) => {
@@ -95,7 +128,7 @@ app.post("/webhook", async (req, res) => {
   const message = value.messages && value.messages[0];
 
   if (message) {
-    processIncomingMessage(message);
+    await processIncomingMessage(message);
   }
 
   res.sendStatus(200);
