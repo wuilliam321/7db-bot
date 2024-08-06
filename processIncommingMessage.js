@@ -7,7 +7,7 @@ const execPromise = promisify(exec);
 const { GRAPH_API_TOKEN, PHONE_ID } = process.env;
 
 // Función para enviar mensajes con imagen
-const sendImageMessage = async (to, imageUrl, text) => {
+const sendMessage = async (to, text, imageUrl) => {
   const req = {
     messaging_product: "whatsapp",
     to,
@@ -32,11 +32,19 @@ const sendImageMessage = async (to, imageUrl, text) => {
       }
     );
     console.log("Image message sent:", response.data);
+    return {
+      success: true,
+      message: text,
+    }
   } catch (error) {
     console.error(
       "Error sending image message:",
       error.response ? error.response.data : error.message
     );
+    return {
+      success: false,
+      message: error.response ? error.response.data : error.message,
+    }
   }
 };
 
@@ -57,65 +65,75 @@ async function runPythonScript(chatId) {
 
     let msg = "Saldo:\n" + lines[0] + "\n";
     msg += "Ultimos movimientos:\n" + lines.slice(1, 6).join("\n");
-    sendImageMessage(chatId, "", msg);
+    return sendMessage(chatId, msg);
   } catch (error) {
     console.error(`Error al ejecutar el comando: ${error.message}`);
-      sendImageMessage(chatId, "", "❌ No se pudo ingresar al banco");
+    return sendMessage(chatId, "❌ No se pudo ingresar al banco");
   }
+}
+
+function getProductInfo(producto) {
+  const disponibilidad = producto["Vendido"] == "SI" ? "❌ Vendido" : producto["Apartado"] == "SI" ? "🔒 Apartado" : "✅ Disponible";
+  const precio = `*💰 PRECIO: \$${producto["Precio Sugerido"]}*`
+  const descripcion = `🔍 ${producto.DESCRIPCION}`
+  const marca = producto.MARCA
+  const talla = `Talla: ${capitalize(producto.TALLA)}`
+  const color = `Color: ${capitalize(producto.COLOR)}`
+  const ubicacion = `📍 Ubicación: ${producto.Ubicacion}`
+
+  return `
+${disponibilidad}
+
+${precio}
+
+${descripcion} ${marca}
+${talla}
+${color}
+
+${ubicacion}`;
 }
 
 // Función para procesar mensajes entrantes
 const processIncomingMessage = async (message, productos) => {
   try {
-    if (message.text.body == "") {
-      return false;
+    if (!message.text || !message.text.body) {
+      return {
+        success: false,
+        message: "Empty message",
+      }
     }
 
     const content = message.text.body.toUpperCase();
     if (content.trim().toLowerCase() == "pagomovil" || content.trim().toLowerCase() == "pago movil" || content.trim().toLowerCase() == "pago móvil") {
       console.log("vamos a verificar pago movil")
-      sendImageMessage(message.from, "", "Un momento por favor...");
-      runPythonScript(message.from);
-      return true;
+      const res = sendMessage(message.from, "Un momento por favor...");
+      if (!res.success) {
+        return res;
+      }
+      return runPythonScript(message.from);
     } else {
-      const codigos = content.split(" ");
-      let respuestas = [];
-      for (let codigo of codigos) {
-        const producto = productos.find((p) => p.CODIGO === codigo);
-        if (producto) {
-          const infoProducto = `
-${producto["Vendido"] == "SI" ? "❌ Vendido" : producto["Apartado"] == "SI" ? "🔒 Apartado" : "✅ Disponible"}
-
-*💰 PRECIO: \$${producto["Precio Sugerido"]}*
-
-🔍 ${producto.DESCRIPCION} ${producto.MARCA}
-Talla: ${capitalize(producto.TALLA)}
-Color: ${capitalize(producto.COLOR)}
-
-📍 Ubicación: ${producto.Ubicacion}`;
-          respuestas.push({ codigo, infoProducto, imageUrl: producto.IMAGEN });
-        } else {
-          respuestas.push({
-            codigo,
-            infoProducto: "Producto no encontrado",
-            imageUrl: null,
-          });
-        }
+      const codigo = content.trim();
+      let respuesta = {};
+      const producto = productos.find((p) => p.CODIGO === codigo);
+      if (producto) {
+        const infoProducto = getProductInfo(producto);
+        respuesta = { codigo, infoProducto, imageUrl: producto.IMAGEN };
+      } else {
+        respuesta = { codigo, infoProducto: "Producto no encontrado", imageUrl: null };
       }
 
-      for (let respuesta of respuestas) {
-        sendImageMessage(message.from, respuesta.imageUrl, `Código: ${respuesta.codigo}\n${respuesta.infoProducto}`);
-      }
+      return sendMessage(message.from, `Código: ${respuesta.codigo}\n${respuesta.infoProducto}`, respuesta.imageUrl);
     }
   } catch (error) {
     console.error(
       "Error procesando mensaje entrante:",
       error.response ? error.response.data : error.message
     );
-    return false;
+    return {
+      success: false,
+      message: error.response ? error.response.data : error.message,
+    }
   }
-
-  return true;
 };
 
 function capitalize(string) {

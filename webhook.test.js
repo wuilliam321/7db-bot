@@ -20,7 +20,23 @@ describe("processIncomingMessage", () => {
 
     axios.post.mockResolvedValueOnce({ data: {} });
     const result = await processIncomingMessage(message, productos);
-    expect(result).toBe(true);
+    expect(result.success).toBe(true);
+    expect(result.message).toContain("$25");
+
+  });
+
+  it("should return false for multiple ids", async () => {
+    const message = {
+      text: {
+        body: "DEF456 ABC123",
+      },
+      from: "1234567890",
+    };
+
+    axios.post.mockResolvedValueOnce({ data: {} });
+    const result = await processIncomingMessage(message, productos);
+    expect(result.success).toBe(true);
+    expect(result.message).toContain("Producto no encontrado");
 
   });
 
@@ -38,7 +54,8 @@ describe("processIncomingMessage", () => {
 
     axios.post.mockResolvedValueOnce({ data: {} });
     const result = await processIncomingMessage(message, productos);
-    expect(result).toBe(true);
+    expect(result.success).toBe(true);
+    expect(result.message).toContain("Producto no encontrado");
 
   });
 
@@ -53,7 +70,8 @@ describe("processIncomingMessage", () => {
 
     axios.post.mockResolvedValueOnce({ data: {} });
     const result = await processIncomingMessage(message, productos);
-    expect(result).toBe(false);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain("Empty message");
 
   });
 
@@ -71,7 +89,8 @@ describe("processIncomingMessage", () => {
 
     axios.post.mockResolvedValueOnce({ data: {} });
     const result = await processIncomingMessage(message, productos);
-    expect(result).toBe(false);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain("Empty message");
 
   });
 
