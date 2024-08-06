@@ -1,5 +1,5 @@
 // archivo: tests/processIncomingMessage.test.js
-var axios = require("axios");
+var axios = require("axios").default;
 const { processIncomingMessage } = require("./processIncommingMessage");
 
 jest.mock("axios");
@@ -10,6 +10,10 @@ const productos = [
 ];
 
 describe("processIncomingMessage", () => {
+  afterEach(() => {
+    axios.post.mockReset();
+  });
+
   it("should return true for a valid message", async () => {
     const message = {
       text: {
@@ -18,7 +22,7 @@ describe("processIncomingMessage", () => {
       from: "1234567890",
     };
 
-    axios.post.mockResolvedValueOnce({ data: {} });
+    axios.post.mockResolvedValueOnce({ data: {}, status: 200 });
     const result = await processIncomingMessage(message, productos);
     expect(result.success).toBe(true);
     expect(result.message).toContain("$25");
@@ -33,7 +37,7 @@ describe("processIncomingMessage", () => {
       from: "1234567890",
     };
 
-    axios.post.mockResolvedValueOnce({ data: {} });
+    axios.post.mockResolvedValueOnce({ data: {}, status: 200 });
     const result = await processIncomingMessage(message, productos);
     expect(result.success).toBe(true);
     expect(result.message).toContain("Producto no encontrado");
@@ -52,7 +56,7 @@ describe("processIncomingMessage", () => {
       { CODIGO: "DEF456" },
     ];
 
-    axios.post.mockResolvedValueOnce({ data: {} });
+    axios.post.mockResolvedValueOnce({ data: {}, status: 200 });
     const result = await processIncomingMessage(message, productos);
     expect(result.success).toBe(true);
     expect(result.message).toContain("Producto no encontrado");
@@ -68,7 +72,7 @@ describe("processIncomingMessage", () => {
       { CODIGO: "DEF456" },
     ];
 
-    axios.post.mockResolvedValueOnce({ data: {} });
+    axios.post.mockResolvedValueOnce({ data: {}, status: 200 });
     const result = await processIncomingMessage(message, productos);
     expect(result.success).toBe(false);
     expect(result.message).toContain("Empty message");
@@ -87,10 +91,25 @@ describe("processIncomingMessage", () => {
       { CODIGO: "DEF456" },
     ];
 
-    axios.post.mockResolvedValueOnce({ data: {} });
+    axios.post.mockResolvedValueOnce({ data: {}, status: 200 });
     const result = await processIncomingMessage(message, productos);
     expect(result.success).toBe(false);
     expect(result.message).toContain("Empty message");
+
+  });
+
+  it("should return false for a bad request", async () => {
+    const message = {
+      text: {
+        body: "DEF456",
+      },
+      from: "1234567890",
+    };
+
+    axios.post.mockResolvedValueOnce({ data: {}, status: 400, statusText: "Bad Request" });
+    const result = await processIncomingMessage(message, productos);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain("Bad Request");
 
   });
 

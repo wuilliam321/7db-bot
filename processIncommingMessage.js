@@ -1,4 +1,4 @@
-var axios = require("axios");
+var axios = require("axios").default;
 const { exec } = require('child_process');
 const { promisify } = require('util');
 
@@ -31,7 +31,13 @@ const sendMessage = async (to, text, imageUrl) => {
         },
       }
     );
-    console.log("Image message sent:", response.data);
+    console.log("response", response);
+    if (response.status != 200) {
+      return {
+        success: false,
+        message: response.statusText,
+      }
+    }
     return {
       success: true,
       message: text,
@@ -61,7 +67,6 @@ async function runPythonScript(chatId) {
     }
 
     const lines = stdout.trim().split('\n');
-    console.log(lines);
 
     let msg = "Saldo:\n" + lines[0] + "\n";
     msg += "Ultimos movimientos:\n" + lines.slice(1, 6).join("\n");
@@ -105,7 +110,6 @@ const processIncomingMessage = async (message, productos) => {
 
     const content = message.text.body.toUpperCase();
     if (content.trim().toLowerCase() == "pagomovil" || content.trim().toLowerCase() == "pago movil" || content.trim().toLowerCase() == "pago móvil") {
-      console.log("vamos a verificar pago movil")
       const res = sendMessage(message.from, "Un momento por favor...");
       if (!res.success) {
         return res;
