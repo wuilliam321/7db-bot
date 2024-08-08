@@ -8,7 +8,7 @@ const products = [];
 const app = express();
 app.use(express.json());
 
-const { WEBHOOK_VERIFY_TOKEN, PORT } = process.env;
+const { WEBHOOK_VERIFY_TOKEN, PORT, DEBUG } = process.env;
 
 // Leer datos del CSV
 fs.createReadStream("productos.csv")
@@ -27,7 +27,9 @@ app.post("/webhook", async (req, res) => {
   const message = value.messages && value.messages[0];
 
   if (message) {
-    await processIncomingMessage(message, products);
+    !!DEBUG && console.log(message);
+    const response = await processIncomingMessage(message, products);
+    !!DEBUG && console.log(response);
   }
 
   res.sendStatus(200);

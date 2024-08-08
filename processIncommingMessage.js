@@ -4,7 +4,7 @@ const { promisify } = require('util');
 
 const execPromise = promisify(exec);
 
-const { GRAPH_API_TOKEN, PHONE_ID } = process.env;
+const { GRAPH_API_TOKEN, PHONE_ID, DEBUG } = process.env;
 
 // Función para enviar mensajes con imagen
 const sendMessage = async (to, text, imageUrl) => {
@@ -21,6 +21,16 @@ const sendMessage = async (to, text, imageUrl) => {
     }
   }
   try {
+    !! DEBUG && console.log("request",
+      `https://graph.facebook.com/v20.0/${PHONE_ID}/messages`,
+      req,
+      {
+        headers: {
+          Authorization: `Bearer ${GRAPH_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
     const response = await axios.post(
       `https://graph.facebook.com/v20.0/${PHONE_ID}/messages`,
       req,
@@ -31,7 +41,7 @@ const sendMessage = async (to, text, imageUrl) => {
         },
       }
     );
-    console.log("response", response);
+    !! DEBUG && console.log("response", response);
     if (response.status != 200) {
       return {
         success: false,
@@ -55,10 +65,9 @@ const sendMessage = async (to, text, imageUrl) => {
 };
 
 async function runPythonScript(chatId) {
-  const pythonCommand = '/usr/bin/python3 /home/wuilliam/personal/7db-pagomovil/run.py 17129071 \\$carlos8 1464,40';
-  // const pythonCommand = '/usr/bin/python3 /home/wuilliam/personal/7db-pagomovil/run.py 16444162 \\*Aurora8 1464,40';
+  const pythonCommand = '/home/wuilliam/proyectos/7db-pagomovil/.venv/bin/python /home/wuilliam/proyectos/7db-pagomovil/run.py 17129071 \\$carlos8 1464,40';
+  // const pythonCommand = '/usr/bin/python3 /home/wuilliam/proyectos/7db-pagomovil/run.py 16444162 \\*Aurora8 1464,40';
 
-  try {
     const { stdout, stderr } = await execPromise(pythonCommand, { shell: '/bin/bash' });
 
     if (stderr) {
@@ -70,11 +79,7 @@ async function runPythonScript(chatId) {
 
     let msg = "Saldo:\n" + lines[0] + "\n";
     msg += "Ultimos movimientos:\n" + lines.slice(1, 6).join("\n");
-    return sendMessage(chatId, msg);
-  } catch (error) {
-    console.error(`Error al ejecutar el comando: ${error.message}`);
-    return sendMessage(chatId, "❌ No se pudo ingresar al banco");
-  }
+    return await sendMessage(chatId, msg);
 }
 
 function getProductInfo(producto) {
@@ -110,7 +115,7 @@ const processIncomingMessage = async (message, productos) => {
 
     const content = message.text.body.toUpperCase();
     if (content.trim().toLowerCase() == "pagomovil" || content.trim().toLowerCase() == "pago movil" || content.trim().toLowerCase() == "pago móvil") {
-      const res = sendMessage(message.from, "Un momento por favor...");
+      const res = await sendMessage(message.from, "Un momento por favor...");
       if (!res.success) {
         return res;
       }
@@ -126,7 +131,7 @@ const processIncomingMessage = async (message, productos) => {
         respuesta = { codigo, infoProducto: "Producto no encontrado", imageUrl: null };
       }
 
-      return sendMessage(message.from, `Código: ${respuesta.codigo}\n${respuesta.infoProducto}`, respuesta.imageUrl);
+      return await sendMessage(message.from, `Código: ${respuesta.codigo}\n${respuesta.infoProducto}`, respuesta.imageUrl);
     }
   } catch (error) {
     console.error(
